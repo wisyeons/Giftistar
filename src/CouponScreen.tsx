@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 const SearchIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -13,7 +13,6 @@ const ChevronDownIcon = () => (
   </svg>
 );
 
-const MagicWandIcon = () => <span className="text-[20px] drop-shadow-sm mr-2 text-[#FF8A00]">✨</span>;
 const LargeMagicWandIcon = () => <span className="text-[40px] drop-shadow-sm">✨</span>;
 
 const PhotoIcon = () => (
@@ -29,10 +28,11 @@ type Coupon = {
   buyDate: string;
   useDate?: string;
   expireDate?: string;
-  status: '사용가능' | '사용완료';
+  status: '사용가능' | '사용완료' | '판매완료';
   dDay?: number;
   emoji: string;
   bgColor?: string;
+  isSold?: boolean;
 };
 
 const USED_COUPONS: Coupon[] = [
@@ -49,32 +49,32 @@ const AVAILABLE_COUPONS: Coupon[] = [
   { id: 'a4', brand: '스타벅스', name: '[e-Gift Item] 콜드 브루 T (앱 사용 불가)', price: 4800, originalPrice: 4900, buyDate: '2024-05-07 18:35', expireDate: '26-05-24 까지', status: '사용가능', dDay: 1123, emoji: '☕', bgColor: '#F2F2F7' }
 ];
 
+// 자동 분류를 위해 더 풍부해진 샘플 데이터
 const SCANNED_COUPONS: Coupon[] = [
-  { id: 's1', brand: '스타벅스', name: '아이스 카페 아메리카노 T', price: 4500, originalPrice: 4500, buyDate: '2026-03-23 09:12', expireDate: '26-06-23 까지', status: '사용가능', dDay: 93, emoji: '☕', bgColor: '#E8F5E9' },
-  { id: 's2', brand: '교촌치킨', name: '허니콤보+웨지감자세트', price: 26000, originalPrice: 26000, buyDate: '2026-03-20 18:30', expireDate: '26-04-20 까지', status: '사용가능', dDay: 28, emoji: '🍗', bgColor: '#FFF8E1' },
-  { id: 's3', brand: 'BHC', name: '뿌링클+콜라 1.25L', price: 21000, originalPrice: 21000, buyDate: '2026-03-22 19:15', expireDate: '26-03-28 까지', status: '사용가능', dDay: 5, emoji: '🍕', bgColor: '#FFF0F5' },
+  { id: 's1', brand: '스타벅스', name: '아이스 카페 아메리카노 T', price: 4500, originalPrice: 4500, buyDate: '2026-03-23 09:12', expireDate: '26-06-23 까지', status: '사용가능', dDay: 93, emoji: '☕', bgColor: '#E8F5E9', isSold: false },
+  { id: 's2', brand: '스타벅스', name: '부드러운 생크림 카스텔라', price: 4500, originalPrice: 4500, buyDate: '2026-03-20 12:30', expireDate: '26-05-20 까지', status: '사용가능', dDay: 58, emoji: '🍰', bgColor: '#E8F5E9', isSold: false },
+  { id: 's3', brand: '교촌치킨', name: '허니콤보+웨지감자세트', price: 26000, originalPrice: 26000, buyDate: '2026-03-20 18:30', expireDate: '26-04-20 까지', status: '사용가능', dDay: 28, emoji: '🍗', bgColor: '#FFF8E1', isSold: false },
+  { id: 's4', brand: '스타벅스', name: '아이스 카페 라떼 T', price: 5000, originalPrice: 5000, buyDate: '2024-11-10 12:00', useDate: '24-11-15 15:40', status: '판매완료', emoji: '☕', bgColor: '#E8F5E9', isSold: true },
+  { id: 's5', brand: 'BHC', name: '뿌링클+콜라 1.25L', price: 21000, originalPrice: 21000, buyDate: '2025-08-22 19:15', useDate: '25-08-25 10:15', status: '판매완료', emoji: '🍕', bgColor: '#FFF0F5', isSold: true },
 ];
 
+type SubTabType = '전체' | '보유' | '사용/만료' | '쿠폰 관리';
+
 export default function CouponScreen() {
-  // 최상위 탭: 구매함 vs 관리함
   const [activeTopTab, setActiveTopTab] = useState<'구매함' | '관리함'>('구매함');
-  // 구매함 내 서브 탭
   const [activeSubTab, setActiveSubTab] = useState<'전체' | '보유' | '사용/만료'>('전체');
   
-  // 기능용 데이터 State 
   const [availableCoupons, setAvailableCoupons] = useState<Coupon[]>(AVAILABLE_COUPONS);
   const [usedCoupons, setUsedCoupons] = useState<Coupon[]>(USED_COUPONS);
   const [scannedCoupons, setScannedCoupons] = useState<Coupon[]>([]);
 
-  // 갤러리 자동 스캔 흐름 State
   const [hasScanned, setHasScanned] = useState(false);
   const [isGallerySyncOpen, setIsGallerySyncOpen] = useState(false);
   const [modalStage, setModalStage] = useState<'permission' | 'scanning' | 'complete'>('permission');
 
-  // 상세 보기 모달 State
   const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null);
 
-  const subTabs = ['전체', '보유', '사용/만료'] as const;
+  const subTabs: SubTabType[] = ['전체', '보유', '사용/만료'];
 
   // 디스플레이 데이터 (구매함 용)
   let displayCoupons: Coupon[] = [];
@@ -97,7 +97,10 @@ export default function CouponScreen() {
   };
 
   const handleAddScannedCoupons = () => {
-    setAvailableCoupons(prev => [...SCANNED_COUPONS, ...prev]);
+    setAvailableCoupons(prev => [...SCANNED_COUPONS.filter(c => !c.isSold), ...prev]);
+    const newlyUsed = SCANNED_COUPONS.filter(c => c.isSold).map(c => ({...c, status: '판매완료'} as Coupon));
+    setUsedCoupons(prev => [...newlyUsed, ...prev]);
+    
     setScannedCoupons([...SCANNED_COUPONS]);
     setHasScanned(true);
     setIsGallerySyncOpen(false);
@@ -113,19 +116,19 @@ export default function CouponScreen() {
   };
 
   // 렌더링 헬퍼
-  const renderCouponItem = (c: Coupon) => (
+  const renderCouponItem = (c: Coupon, forceDim = false) => (
     <div 
       key={c.id} 
       onClick={() => setSelectedCoupon(c)}
-      className="flex px-[18px] py-[22px] border-b border-[#F2F2F7] cursor-pointer active:bg-gray-50 transition-colors"
+      className={`flex px-[18px] py-[22px] border-b border-[#E5E5EA] bg-white cursor-pointer active:bg-gray-50 transition-colors ${forceDim ? 'opacity-[0.45] grayscale-[20%]' : ''}`}
     >
-      <div className="w-[96px] h-[64px] rounded-[6px] flex items-center justify-center shrink-0 mr-4 shadow-sm border border-black/5" style={{ backgroundColor: c.bgColor || '#F2F2F7' }}>
+      <div className="w-[96px] h-[64px] rounded-[6px] flex items-center justify-center shrink-0 mr-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-black/5" style={{ backgroundColor: c.bgColor || '#F2F2F7' }}>
         <span className="text-[32px]">{c.emoji}</span>
       </div>
       <div className="flex-1 min-w-0 flex flex-col justify-center">
         <div className="flex justify-between items-center mb-1">
           <span className="text-[12.5px] text-[#8E8E93] font-medium tracking-tight mb-[2px]">{c.brand}</span>
-          <span className={`text-[12.5px] font-bold tracking-tight ${c.status === '사용가능' ? 'text-[#FF8A00]' : 'text-[#D1D5DB]'}`}>{c.status}</span>
+          <span className={`text-[12.5px] font-bold tracking-tight ${c.status === '사용가능' ? 'text-[#FF8A00]' : 'text-[#8E8E93]'}`}>{c.status}</span>
         </div>
         <div className="text-[16px] font-bold text-[#111111] mb-[2px] line-clamp-1 tracking-tight leading-snug">{c.name}</div>
         <div className="mb-[6px] flex items-baseline">
@@ -134,8 +137,8 @@ export default function CouponScreen() {
         </div>
         <div className="text-[12px] text-[#A1A1AA] font-medium tracking-tight mt-[1px]">구매일시 {c.buyDate}</div>
         <div className="text-[12px] text-[#A1A1AA] font-medium mt-[1px] tracking-tight flex items-center">
-          {c.useDate ? `사용일시 ${c.useDate}` : `만료일 ${c.expireDate}`}
-          {c.dDay !== undefined && (
+          {c.useDate ? (c.status === '판매완료' ? `판매일시 ${c.useDate}` : `사용일시 ${c.useDate}`) : `만료일 ${c.expireDate}`}
+          {c.dDay !== undefined && c.status === '사용가능' && (
             <span className={`px-[7px] py-[2px] rounded-[4px] ml-[8px] font-bold text-[10px] tracking-tight ${c.dDay <= 10 ? 'bg-red-100 text-red-600' : 'bg-[#FFF0E6] text-[#FF8A00]'}`}>
               D-{c.dDay}
             </span>
@@ -145,11 +148,23 @@ export default function CouponScreen() {
     </div>
   );
 
+  // 브랜드별 그룹핑 헬퍼
+  const groupByBrand = (coupons: Coupon[]) => {
+    return coupons.reduce((acc, coupon) => {
+      if (!acc[coupon.brand]) acc[coupon.brand] = [];
+      acc[coupon.brand].push(coupon);
+      return acc;
+    }, {} as Record<string, Coupon[]>);
+  };
+
+  const unsoldGroups = groupByBrand(scannedCoupons.filter(c => !c.isSold));
+  const soldGroups = groupByBrand(scannedCoupons.filter(c => c.isSold));
+
   return (
-    <div className="flex flex-col h-full bg-white text-[#111111] w-full relative">
+    <div className="flex flex-col h-full bg-[#f4f4f5] text-[#111111] w-full relative">
       
-      {/* 고정 헤더: 내 쿠폰함 타이틀 & 구매함/관리함 탭 */}
-      <div className="flex-none bg-white z-10 shrink-0">
+      {/* 고정 헤더 영역 */}
+      <div className="flex-none bg-white z-10 shrink-0 shadow-sm relative">
         <div className="pt-12 pb-[14px] text-center text-[18px] font-bold tracking-tight">내 쿠폰함</div>
         
         {/* 상단 탭: 구매함 vs 관리함 */}
@@ -157,17 +172,17 @@ export default function CouponScreen() {
           <button 
             onClick={() => setActiveTopTab('구매함')}
             className={`flex-1 py-[15px] text-center text-[17px] relative transition-colors ${
-              activeTopTab === '구매함' ? 'text-[#FF8A00] font-bold' : 'text-[#8E8E93] font-medium'
+              activeTopTab === '구매함' ? 'text-[#111] font-bold' : 'text-[#8E8E93] font-medium'
             }`}
           >
             <span className="tracking-tight">구매함</span>
-            {activeTopTab === '구매함' && <div className="absolute bottom-0 left-0 w-full h-[4px] bg-[#FF8A00]" />}
+            {activeTopTab === '구매함' && <div className="absolute bottom-0 left-0 w-full h-[4px] bg-[#111]" />}
           </button>
           
           <button 
             onClick={() => setActiveTopTab('관리함')}
             className={`flex-1 py-[15px] flex items-center justify-center text-[17px] relative transition-colors ${
-              activeTopTab === '관리함' ? 'font-bold' : 'text-[#8E8E93] font-medium'
+              activeTopTab === '관리함' ? 'font-bold text-[#111]' : 'text-[#8E8E93] font-medium'
             }`}
           >
             <span className="tracking-tight">관리함</span>
@@ -178,7 +193,6 @@ export default function CouponScreen() {
           </button>
         </div>
 
-        {/* 구매함 액티브 시 -> 2차 서브 탭 및 검색 */}
         {activeTopTab === '구매함' && (
           <div className="bg-white">
             <div className="px-[18px] pt-[14px] pb-2">
@@ -201,7 +215,6 @@ export default function CouponScreen() {
                 </button>
               ))}
             </div>
-            
             <div className="flex justify-between items-center px-[20px] py-[15px] bg-[#F9F9F9] border-b border-[#E5E5EA]">
               <div className="text-[14px] text-[#111] tracking-tight">총 <span className="font-bold">{displayCoupons.length}</span> 개</div>
               <div className="flex items-center text-[13.5px] text-[#555] font-medium cursor-pointer tracking-tight">신규 등록순 <ChevronDownIcon /></div>
@@ -210,21 +223,20 @@ export default function CouponScreen() {
         )}
       </div>
 
-      {/* 2. 메인 스크롤 영역 */}
+      {/* 메인 스크롤 영역 */}
       {activeTopTab === '구매함' ? (
         <div className="flex-1 overflow-y-auto no-scrollbar pb-[100px] bg-white">
-          {displayCoupons.map(renderCouponItem)}
+          {displayCoupons.map(c => renderCouponItem(c))}
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto no-scrollbar pb-[100px] bg-white relative">
+        <div className="flex-1 overflow-y-auto no-scrollbar pb-[100px] bg-[#f4f4f5] relative">
           {!hasScanned ? (
-            /* 스캔 전: 기능 연동 대시보드 */
-            <div className="flex flex-col items-center justify-center h-full px-6 text-center -mt-10 min-h-[440px]">
+            <div className="flex flex-col items-center justify-center h-full px-6 text-center -mt-10 min-h-[440px] bg-white">
               <div className="w-[88px] h-[88px] bg-gradient-to-tr from-[#FFF4EB] to-[#FFF0E6] rounded-full flex items-center justify-center mb-6 shadow-sm border border-[#FF8A00]/15">
                 <LargeMagicWandIcon />
               </div>
               <h3 className="text-[22px] font-bold text-[#111111] mb-[12px] tracking-tight leading-snug">
-                갤러리 속 숨은 쿠폰 찾기
+                갤러리 속 숨은 쿠폰을 찾아드려요
               </h3>
               <p className="text-[15px] text-[#8E8E93] mb-[36px] font-medium leading-[1.6] tracking-tight break-keep">
                 여기저기 흩어진 쿠폰 이미지를 자동으로 찾아내어<br/>브랜드별로 편하게 관리해 드려요.
@@ -233,44 +245,78 @@ export default function CouponScreen() {
                 onClick={handleStartScan}
                 className="bg-[#FF8A00] text-white px-8 py-[18px] rounded-[16px] font-bold text-[17px] w-full max-w-[280px] active:bg-[#E57800] transition-colors shadow-[0_4px_16px_rgba(255,138,0,0.25)]"
               >
-                기능 연동 시작하기
+                지금 쿠폰 찾기
               </button>
             </div>
           ) : (
-            /* 스캔 후: 찾은 쿠폰 결과 리포트 */
-            <div className="pb-8 bg-[#F9F9F9] min-h-full">
-              <div className="px-[22px] pt-[36px] pb-[28px] bg-white rounded-b-[24px] shadow-sm mb-4">
-                <div className="inline-block bg-[#FFF0E6] text-[#FF8A00] px-3 py-1 rounded-full font-bold text-[12px] mb-3 tracking-tight">
-                  방금 연동 성공
+            <div className="pb-8 pt-4">
+              
+              {/* 상단 써머리 리포트 배너 */}
+              <div className="px-[20px] py-[28px] bg-white mx-4 rounded-[20px] shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-[#E5E5EA] mb-6">
+                <div className="inline-block bg-[#FFF0E6] text-[#FF8A00] px-3 py-1 rounded-full font-bold text-[12.5px] mb-3 tracking-tight">
+                  방금 연동 및 스캔 성공
                 </div>
-                <h3 className="text-[23px] font-bold text-[#111] mb-2 leading-[1.4] tracking-tight">
-                  새로 발견한 쿠폰이<br/><span className="text-[#FF8A00]">{scannedCoupons.length}장</span> 찾아왔어요!
+                <h3 className="text-[24px] font-bold text-[#111] mb-2 leading-[1.3] tracking-tight">
+                  총 <span className="text-[#FF8A00]">{scannedCoupons.length}장</span>의 쿠폰 발견!
                 </h3>
-                <p className="text-[14.5px] text-[#8E8E93] font-medium tracking-tight mt-3">아래 쿠폰들은 통합되어 자동 관리됩니다.</p>
+                <p className="text-[14px] text-[#8E8E93] font-medium tracking-tight mt-3">기프티스타 판매 이력과 비교하여 완벽하게 분류했습니다.</p>
               </div>
               
-              <div className="bg-white rounded-xl mx-4 shadow-sm border border-gray-100 overflow-hidden mb-8">
-                {scannedCoupons.map(renderCouponItem)}
+              {/* 섹션 1: 바로 판매 가능한 추천 쿠폰 (미판매) */}
+              <div className="bg-white mx-4 rounded-[20px] shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-[#E5E5EA] overflow-hidden mb-6">
+                <div className="bg-[#FFF8F2] px-[20px] py-[18px] border-b border-[#FFE0C2] flex items-center justify-between">
+                  <div className="flex items-center">
+                    <span className="w-[8px] h-[8px] rounded-full bg-[#FF8A00] mr-2.5"></span>
+                    <span className="text-[16px] font-bold text-[#FF8A00] tracking-tight">기프티스타 미판매 쿠폰</span>
+                  </div>
+                  <span className="text-[14px] text-[#FF8A00] font-bold opacity-80">{scannedCoupons.filter(c=>!c.isSold).length}장</span>
+                </div>
+                
+                {Object.entries(unsoldGroups).map(([brand, list], idx) => (
+                  <div key={brand} className={`${idx > 0 ? 'border-t-[8px] border-[#F9F9F9]' : ''}`}>
+                    <div className="px-[20px] py-[14px] bg-white border-b border-[#F2F2F7] flex justify-between items-center">
+                      <span className="text-[15px] font-bold text-[#111] tracking-tight">{brand}</span>
+                      <span className="text-[13px] text-[#8E8E93] font-medium">{list.length} 개</span>
+                    </div>
+                    <div>
+                      {list.map(c => renderCouponItem(c, false))}
+                    </div>
+                  </div>
+                ))}
               </div>
 
-              <div className="px-5">
-                <button 
-                  onClick={() => setActiveTopTab('구매함')}
-                  className="w-full bg-[#E5E5EA] text-[#111] font-bold text-[16px] py-[16px] rounded-[16px] active:bg-gray-300 transition-colors shadow-sm"
-                >
-                  보유 탭에서 이어서 보기
-                </button>
+              {/* 섹션 2: 이미 판매/사용한 쿠폰 목록 */}
+              <div className="bg-white mx-4 rounded-[20px] shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-[#E5E5EA] overflow-hidden mb-8">
+                <div className="bg-[#F5F5F7] px-[20px] py-[18px] border-b border-[#E5E5EA] flex items-center justify-between">
+                  <div className="flex items-center">
+                    <span className="w-[8px] h-[8px] rounded-full bg-[#A1A1AA] mr-2.5"></span>
+                    <span className="text-[15px] font-bold text-[#555] tracking-tight">이미 판매 완료된 쿠폰 로그</span>
+                  </div>
+                  <span className="text-[14px] text-[#A1A1AA] font-bold">{scannedCoupons.filter(c=>c.isSold).length}장</span>
+                </div>
+                
+                {Object.entries(soldGroups).map(([brand, list], idx) => (
+                  <div key={brand} className={`${idx > 0 ? 'border-t-[8px] border-[#F9F9F9]' : ''}`}>
+                    <div className="px-[20px] py-[14px] bg-white border-b border-[#F2F2F7] flex justify-between items-center">
+                      <span className="text-[14px] font-bold text-[#8E8E93] tracking-tight">{brand}</span>
+                      <span className="text-[13px] text-[#A1A1AA] font-medium">{list.length} 개</span>
+                    </div>
+                    <div>
+                      {list.map(c => renderCouponItem(c, true))}
+                    </div>
+                  </div>
+                ))}
               </div>
+
             </div>
           )}
         </div>
       )}
 
-      {/* 3. 모달: 갤러리 자동 스캔 프로세스 */}
+      {/* 모달 2개는 기존과 동일하게 유지 */}
       <div className={`fixed inset-0 z-[100] transition-opacity duration-300 ${isGallerySyncOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={() => modalStage === 'permission' && setIsGallerySyncOpen(false)} />
         
-        {/* 중앙 모달 */}
         <div className={`absolute inset-x-8 top-1/2 -translate-y-1/2 bg-white rounded-[24px] p-8 shadow-2xl flex flex-col items-center text-center transition-transform duration-300 ${isGallerySyncOpen ? 'scale-100' : 'scale-95'}`}>
           {modalStage === 'permission' && (
             <>
@@ -285,7 +331,7 @@ export default function CouponScreen() {
               </p>
               <div className="bg-[#F5F5F7] p-[18px] text-left w-full rounded-[16px] mb-[28px]">
                 <p className="text-[12.5px] text-[#555] leading-[1.6] break-keep tracking-tight">
-                  <strong className="text-[#FF8A00] font-bold">쿠폰 이미지만 인식</strong>하며, 다른 일반 사진은 수집하지 않습니다. 동의 후 환경설정에서 철회할 수 있습니다.
+                  <strong className="text-[#FF8A00] font-bold">쿠폰 이미지만 인식</strong>하며, 다른 일반 사진은 수집하지 않습니다. 동의 후 수정 가능합니다.
                 </p>
               </div>
               <div className="flex gap-2.5 w-full">
@@ -320,7 +366,7 @@ export default function CouponScreen() {
                 새로운 쿠폰 <span className="text-[#FF8A00]">{SCANNED_COUPONS.length}장</span> 발견!
               </h3>
               <p className="text-[14.5px] text-[#8E8E93] mb-8 font-medium tracking-tight">
-                브랜드별로 깔끔하게 정리해두었어요.
+                기존 판매 내역과 통합하여 정리해두었어요.
               </p>
               <button 
                 onClick={handleAddScannedCoupons}
@@ -333,7 +379,6 @@ export default function CouponScreen() {
         </div>
       </div>
 
-      {/* 4. 모달: 쿠폰 상세 정보 컴포넌트 */}
       <div className={`fixed inset-0 z-[100] transition-opacity duration-300 ${selectedCoupon ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" onClick={() => setSelectedCoupon(null)} />
         
@@ -394,7 +439,7 @@ export default function CouponScreen() {
                     }}
                     className="flex-1 py-[16px] bg-[#FFF0E6] text-[#FF8A00] font-bold text-[16px] rounded-[16px] active:bg-[#FFE5D1] transition-colors"
                   >
-                    판매하기
+                    기프티스타에 판매
                   </button>
                   <button 
                     onClick={handleUseCoupon}
